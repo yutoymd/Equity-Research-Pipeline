@@ -110,21 +110,29 @@ def build_core_statement_table(company_facts: dict) -> dict[str, pd.DataFrame]:
 
 def annual_only(df: pd.DataFrame) -> pd.DataFrame:
     """
-    The companyfacts API returns quarterly (10-Q, fp='Q1'/'Q2'/'Q3') and
-    annual (10-K, fp='FY') data mixed together, plus sometimes duplicate
-    entries from amended filings. This filters down to annual (fp=='FY')
-    rows only, sorted by fiscal year -- your starting point for a clean
-    3-year historical table.
-
-    NOTE: inspect the raw 'form' and 'fp' columns yourself before trusting
-    this blindly -- duplicate/restated entries are exactly the kind of
-    silent data-quality issue flagged in the README's reconciliation
-    section.
+    Filters to full-year (annual) data. Rather than trusting the 'fp'
+    label alone -- which can be missing or None for facts sourced from
+    filings like DEF 14A proxy statements rather than the 10-K itself --
+    this identifies annual periods by checking that the reporting period
+    actually spans ~1 year. This was discovered as a real bug: Qnity's
+    NetIncomeLoss annual figure came from a DEF 14A with fp=None, and was
+    being silently dropped by a strict fp=='FY' filter.
     """
-    annual = df[df["fp"] == "FY"].copy()
+    df = df.copy()
+    df["start"] = pd.to_datetime(df["start"])
+    df["end"] = pd.to_datetime(df["end"])
+    df["period_days"] = (df["end"] - df["start"]).dt.days
+
+    # A full fiscal year is ~365 days (allow some slack for leap years
+    # and reporting quirks).
+    annual = df[(df["period_days"] >= 350) & (df["period_days"] <= 380)].copy()
+
+    # Use the END date's year as the fiscal year label, since 'fy' can
+    # also be missing/None on some rows (as seen with the DEF 14A row).
+    annual["fy"] = annual["end"].dt.year
+
     annual = annual.sort_values("fy").drop_duplicates(subset=["fy"], keep="last")
     return annual[["fy", "val", "form", "filed"]]
-
 
 def build_annual_table(company_facts: dict) -> pd.DataFrame:
     """
