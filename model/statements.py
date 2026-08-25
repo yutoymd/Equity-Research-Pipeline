@@ -35,10 +35,14 @@ TAG_CANDIDATES = {
         "CostOfGoodsSold",
     ],
     "gross_profit": [
-        "GrossProfit",
+        # Qnity's XBRL data does not tag Gross Profit as a standalone
+        # line item. Compute later as revenue - cost_of_revenue.
     ],
     "operating_income": [
-        "OperatingIncomeLoss",
+        # Qnity does not tag a true Operating Income line. Closest proxy
+        # is IncomeLossFromContinuingOperations..., which sits AFTER
+        # nonoperating items -- NOT equivalent to real operating income.
+        "IncomeLossFromContinuingOperationsIncludingPortionAttributableToNoncontrollingInterest",
     ],
     "net_income": [
         "NetIncomeLoss",
@@ -65,6 +69,7 @@ TAG_CANDIDATES = {
     ],
     "capex": [
         "PaymentsToAcquirePropertyPlantAndEquipment",
+	"PaymentsToAcquireProductiveAssets",
     ],
 }
 
