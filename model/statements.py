@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 """
 model/statements.py
@@ -125,16 +126,40 @@ def annual_only(df: pd.DataFrame) -> pd.DataFrame:
     return annual[["fy", "val", "form", "filed"]]
 
 
+def build_annual_table(company_facts: dict) -> pd.DataFrame:
+    """
+    Pulls every line item in TAG_CANDIDATES, filters each to annual (FY)
+    data only, and merges them into a single wide table: one row per
+    fiscal year, one column per line item. This is the actual starting
+    point for 3-statement linking -- a clean, combined historical view
+    instead of one line item at a time.
+    """
+    statements = build_core_statement_table(company_facts)
+
+    combined = None
+    for line_item, df in statements.items():
+        if df is None:
+            continue  # skip line items with no matching tag (e.g. gross_profit)
+
+        annual = annual_only(df)[["fy", "val"]].rename(columns={"val": line_item})
+
+        if combined is None:
+            combined = annual
+        else:
+            combined = combined.merge(annual, on="fy", how="outer")
+
+    return combined.sort_values("fy").reset_index(drop=True)
+
 if __name__ == "__main__":
     from data.fetch import fetch_company_facts
 
     QNITY_CIK = "2058873"
     facts = fetch_company_facts(QNITY_CIK)
 
-    statements = build_core_statement_table(facts)
+    annual_table = build_annual_table(facts)
 
-    print("\n--- Revenue (annual) ---")
-    if statements["revenue"] is not None:
-        print(annual_only(statements["revenue"]))
-    else:
-        print("Not found under any candidate tag -- inspect available tags manually.")
+    print("\n--- Combined Annual Historical Table ---")
+    print(annual_table.to_string(index=False))
+
+    annual_table.to_csv("data/qnity_annual_historicals.csv", index=False)
+    print("\nSaved to data/qnity_annual_historicals.csv")
