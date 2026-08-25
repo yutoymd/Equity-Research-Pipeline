@@ -110,27 +110,34 @@ def build_core_statement_table(company_facts: dict) -> dict[str, pd.DataFrame]:
 
 def annual_only(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Filters to full-year (annual) data. Rather than trusting the 'fp'
-    label alone -- which can be missing or None for facts sourced from
-    filings like DEF 14A proxy statements rather than the 10-K itself --
-    this identifies annual periods by checking that the reporting period
-    actually spans ~1 year. This was discovered as a real bug: Qnity's
-    NetIncomeLoss annual figure came from a DEF 14A with fp=None, and was
-    being silently dropped by a strict fp=='FY' filter.
+    Filters to full-year (annual) data. Handles two different XBRL fact
+    shapes:
+    - "duration" facts (Revenue, NetIncomeLoss, capex, etc.) span a
+      period and have both 'start' and 'end' dates -- annual ones are
+      identified by spanning ~365 days.
+    - "instant" facts (Assets, Liabilities, Cash, etc.) are a snapshot
+      at a single point in time and only have an 'end' date -- these are
+      identified by keeping only 10-K-sourced values (annual report
+      balance sheet date), since there's no "duration" to check.
+
+    Rather than trusting the 'fp' label alone, which can be missing/None
+    for facts sourced from filings like DEF 14A rather than the 10-K.
     """
     df = df.copy()
-    df["start"] = pd.to_datetime(df["start"])
     df["end"] = pd.to_datetime(df["end"])
-    df["period_days"] = (df["end"] - df["start"]).dt.days
 
-    # A full fiscal year is ~365 days (allow some slack for leap years
-    # and reporting quirks).
-    annual = df[(df["period_days"] >= 350) & (df["period_days"] <= 380)].copy()
+    if "start" in df.columns and df["start"].notna().any():
+        # Duration fact.
+        df["start"] = pd.to_datetime(df["start"])
+        df["period_days"] = (df["end"] - df["start"]).dt.days
+        annual = df[(df["period_days"] >= 350) & (df["period_days"] <= 380)].copy()
+    else:
+        # Instant fact -- no duration to check. Restrict to values
+        # reported in the annual 10-K itself to avoid quarterly
+        # snapshots.
+        annual = df[df["form"] == "10-K"].copy()
 
-    # Use the END date's year as the fiscal year label, since 'fy' can
-    # also be missing/None on some rows (as seen with the DEF 14A row).
     annual["fy"] = annual["end"].dt.year
-
     annual = annual.sort_values("fy").drop_duplicates(subset=["fy"], keep="last")
     return annual[["fy", "val", "form", "filed"]]
 
