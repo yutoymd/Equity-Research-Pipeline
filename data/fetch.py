@@ -23,7 +23,7 @@ import pandas as pd
 # one (or with a generic one) get blocked. Put your real name/email here --
 # this is standard API etiquette, not just an SEC quirk.
 HEADERS = {
-    "User-Agent": "Your Name your_email@example.com"
+    "User-Agent": "Yuto Yamada yutoyamada81@gmail.com"
 }
 
 BASE_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
