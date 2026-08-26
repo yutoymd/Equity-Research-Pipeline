@@ -137,10 +137,9 @@ def compute_terminal_value(final_year_fcf: float, wacc: float, terminal_growth: 
     return next_year_fcf / (wacc - terminal_growth)
 
 
-def run_dcf(assumptions: dict = FORECAST_ASSUMPTIONS) -> dict:
+def run_dcf(assumptions: dict = FORECAST_ASSUMPTIONS, wacc_override: float = None) -> dict:
     wacc_result = compute_wacc()
-    wacc = wacc_result["wacc"]
-
+    wacc = wacc_override if wacc_override is not None else wacc_result["wacc"]
     fcf_forecast = build_unlevered_fcf_forecast(assumptions)
     discounted = discount_cash_flows(fcf_forecast, wacc)
 
